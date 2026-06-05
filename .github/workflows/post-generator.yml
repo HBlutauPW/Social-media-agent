@@ -1,10 +1,6 @@
 name: 🤖 Social Media Post Generator
 
 on:
-  schedule:
-    - cron: '0 10 * * 1'
-    - cron: '0 10 * * 3'
-    - cron: '0 10 * * 5'
   workflow_dispatch:
     inputs:
       tipo:
@@ -13,13 +9,12 @@ on:
         default: 'ia_news'
         type: choice
         options:
-          - portfolio
           - ia_news
+          - portfolio
           - mercado
           - opiniao
-          - bastidores
       idioma:
-        description: 'Idioma dos posts'
+        description: 'Idioma'
         required: true
         default: 'pt+en'
         type: choice
@@ -27,10 +22,6 @@ on:
           - 'pt+en'
           - 'pt'
           - 'en'
-      material:
-        description: 'Material bruto'
-        required: false
-        default: ''
 
 jobs:
   generate-post:
@@ -39,15 +30,34 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout do repositório
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Chamar agente e gerar post
+      - name: Gerar post via agente
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
+          TIPO: ${{ github.event.inputs.tipo }}
+          IDIOMA: ${{ github.event.inputs.idioma }}
         run: |
-          echo "Chamando: ${{ secrets.VERCEL_URL }}/api/generate"
-          
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ secrets.VERCEL_URL }}/api/generate" \
+          echo "Chamando agente em $VERCEL_URL"
+          curl -s -o draft.json -w "%{http_code}" \
+            -X POST "$VERCEL_URL/api/generate" \
             -H "Content-Type: application/json" \
-            -H "X-Secret: ${{ secrets.AGENT_SECRET }}" \
-            -d "{\"tipo\":\"${{ github.event.inputs.tipo || 'ia_news' }}\",\"idioma\":\"${{ github.event.inputs.idioma || 'pt+en' }}\",\"material\":\"
+            -H "X-Secret: $AGENT_SECRET" \
+            -d "{\"tipo\":\"$TIPO\",\"idioma\":\"$IDIOMA\",\"material\":\"\"}" \
+            > status.txt
+          cat status.txt
+          cat draft.json
+
+      - name: Salvar draft
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          mkdir -p content/drafts
+          python3 -c "
+          import json
+          with open('draft.json') as f:
+              data = json.load(f)
+          draft = data.get('draft', '')
+          filename = 'content/drafts/${DATE}-${{ github.event.inputs.tipo }}.md'
+          with open(filena
