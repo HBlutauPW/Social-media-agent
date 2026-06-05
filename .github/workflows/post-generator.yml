@@ -51,13 +51,6 @@ jobs:
           cat draft.json
 
       - name: Salvar draft
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          mkdir -p content/drafts
-          python3 -c "
-          import json
-          with open('draft.json') as f:
-              data = json.load(f)
-          draft = data.get('draft', '')
-          filename = 'content/drafts/${DATE}-${{ github.event.inputs.tipo }}.md'
-          with open(filena
+        env:
+          TIPO: ${{ github.event.inputs.tipo }}
+        run: python3 scripts/save_draft.py
