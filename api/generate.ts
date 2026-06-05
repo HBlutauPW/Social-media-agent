@@ -21,7 +21,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { tipo = "ia_news", idioma = "pt+en", material = "", projeto = "", parceiro = "" } = req.body || {};
+  const {
+    tipo = "ia_news",
+    idioma = "pt+en",
+    material = "",
+    projeto = "",
+    parceiro = "",
+    link = "",
+  } = req.body || {};
+
+  // Se tiver link, busca e extrai o conteúdo
+  let conteudoLink = "";
+  if (link) {
+    try {
+      const response = await fetch(link, {
+        headers: { "User-Agent": "SocialMediaAgent/1.0" },
+      });
+      const text = await response.text();
+      conteudoLink = text
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 3000);
+    } catch {
+      conteudoLink = "";
+    }
+  }
+
   const promptBase = PROMPTS[tipo] || PROMPTS.ia_news;
 
   const systemPrompt = `Você é o agente de social media de Henrique, arquiteto e diretor criativo de archviz na Perkins & Will em São Paulo. Ele lidera o PW LABs e usa IA generativa no workflow real: Runway Gen-4.5, Veo 3, Sora, Midjourney.
@@ -36,7 +64,9 @@ TIPO: ${tipo}
 IDIOMA: ${idioma}
 ${projeto ? `PROJETO: ${projeto}` : ""}
 ${parceiro ? `PARCEIRO: ${parceiro}` : ""}
-${material ? `MATERIAL: ${material}` : ""}
+${material ? `MATERIAL BRUTO:\n${material}` : ""}
+${conteudoLink ? `CONTEÚDO DO LINK (use como base para o post):\n${conteudoLink}` : ""}
+${!material && !conteudoLink ? "Sem material fornecido — crie um post relevante baseado no tipo e contexto do autor." : ""}
 
 Gere exatamente neste formato:
 
@@ -61,7 +91,7 @@ Gere exatamente neste formato:
 ---
 
 ## VISUAL
-(descrição do visual ideal ou prompt para Midjourney)`;
+(descrição do visual ideal ou prompt para Gemini Imagen)`;
 
   try {
     const response = await client.messages.create({
@@ -71,8 +101,10 @@ Gere exatamente neste formato:
       messages: [{ role: "user", content: userPrompt }],
     });
 
-    const content = response.content[0].type === "text" ? response.content[0].text : "";
+    const content =
+      response.content[0].type === "text" ? response.content[0].text : "";
     const date = new Date().toISOString().split("T")[0];
+
     const draft = `---
 tipo: ${tipo}
 idioma: ${idioma}
@@ -80,6 +112,7 @@ data: ${new Date().toISOString()}
 status: draft
 projeto: "${projeto}"
 parceiro: "${parceiro}"
+link: "${link}"
 ---
 
 ${content}`;
