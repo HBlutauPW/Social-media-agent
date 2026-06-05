@@ -1,111 +1,58 @@
-// ============================================================
-// api/search.ts — Vercel Function de busca de contexto
-// Busca notícias de IA e posts da Perkins & Will via RSS/APIs públicas
-// ============================================================
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-export default async function handler(req: Request): Promise<Response> {
-  const secret = req.headers.get("X-Secret");
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const secret = req.headers["x-secret"];
   if (secret !== process.env.AGENT_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { searchParams } = new URL(req.url);
-  const tipo = searchParams.get("tipo");
+  const tipo = req.query.tipo as string;
 
   try {
     if (tipo === "ia_news") {
-      return await fetchAINews();
+      const result = await fetchAINews();
+      return res.status(200).json(result);
     }
-
     if (tipo === "mercado") {
-      return await fetchMarketNews();
+      const result = await fetchMarketNews();
+      return res.status(200).json(result);
     }
-
-    return Response.json({ results: [] });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Erro";
-    return Response.json({ results: [], error: message });
+    return res.status(200).json({ results: [] });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
   }
 }
 
-// ── Notícias de IA via Hacker News Algolia API (gratuito, sem key) ──
-async function fetchAINews(): Promise<Response> {
-  const queries = [
-    "AI architecture visualization",
-    "generative AI rendering",
-    "AI archviz",
-  ];
-
-  const results: Array<{ title: string; summary: string; url: string }> = [];
-
-  for (const q of queries) {
-    const res = await fetch(
-      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=3&numericFilters=created_at_i>=${Math.floor(Date.now() / 1000) - 7 * 24 * 3600}`
-    );
-    const data = await res.json();
-
-    for (const hit of data.hits || []) {
-      if (hit.title && !results.find((r) => r.title === hit.title)) {
-        results.push({
-          title: hit.title,
-          summary: hit.story_text
-            ? hit.story_text.replace(/<[^>]*>/g, "").slice(0, 200)
-            : hit.title,
-          url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
-        });
-      }
-    }
-  }
-
-  return Response.json({ results: results.slice(0, 5) });
+async function fetchAINews() {
+  const res = await fetch(
+    `https://hn.algolia.com/api/v1/search?query=AI+architecture+visualization&tags=story&hitsPerPage=5`
+  );
+  const data = await res.json();
+  const results = (data.hits || []).slice(0, 5).map((h: any) => ({
+    title: h.title,
+    summary: h.story_text?.replace(/<[^>]*>/g, "").slice(0, 200) || h.title,
+    url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+  }));
+  return { results };
 }
 
-// ── Posts da Perkins & Will via RSS público ──
-async function fetchMarketNews(): Promise<Response> {
-  const feeds = [
-    "https://perkinswill.com/feed/",
-    "https://feeds.feedburner.com/archdaily",  // ArchDaily fallback
-  ];
-
-  const results: Array<{ title: string; summary: string; url: string }> = [];
-
-  for (const feedUrl of feeds) {
-    try {
-      const res = await fetch(feedUrl, {
-        headers: { "User-Agent": "SocialMediaAgent/1.0" },
-      });
-      const text = await res.text();
-
-      // Parse RSS simples via regex (sem dependências externas)
-      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-      const titleRegex = /<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/;
-      const linkRegex = /<link>(.*?)<\/link>/;
-      const descRegex = /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/;
-
-      let match;
-      while ((match = itemRegex.exec(text)) !== null && results.length < 5) {
-        const item = match[1];
-        const title = titleRegex.exec(item)?.[1]?.trim();
-        const link = linkRegex.exec(item)?.[1]?.trim();
-        const desc = descRegex.exec(item)?.[1]
-          ?.replace(/<[^>]*>/g, "")
-          .replace(/&nbsp;/g, " ")
-          .trim()
-          .slice(0, 200);
-
-        if (title && link) {
-          results.push({
-            title,
-            summary: desc || title,
-            url: link,
-          });
-        }
-      }
-    } catch {
-      // Feed falhou, tenta o próximo
-      continue;
+async function fetchMarketNews() {
+  try {
+    const res = await fetch("https://feeds.feedburner.com/archdaily");
+    const text = await res.text();
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    const titleRegex = /<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/;
+    const linkRegex = /<link>(.*?)<\/link>/;
+    const results: any[] = [];
+    let match;
+    while ((match = itemRegex.exec(text)) !== null && results.length < 5) {
+      const item = match[1];
+      const title = titleRegex.exec(item)?.[1]?.trim();
+      const link = linkRegex.exec(item)?.[1]?.trim();
+      if (title && link) results.push({ title, summary: title, url: link });
     }
+    return { results };
+  } catch {
+    return { results: [] };
   }
-
-  return Response.json({ results });
 }
