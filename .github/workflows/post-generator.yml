@@ -54,12 +54,11 @@ jobs:
           TIPO: ${{ github.event.inputs.tipo }}
         run: python3 scripts/save_draft.py
 
-       - name: Commit draft
-         run: |
-           git config user.name "Social Agent"
-           git config user.email "agent@bot.com"
-           git add content/drafts/
-           git status
-           git diff --staged --quiet || git commit -m "draft: $(date +%Y-%m-%d) ${{ github.event.inputs.tipo }}"
-           git push
- 
+      - name: Commit draft
+        run: |
+          git config user.name "Social Agent"
+          git config user.email "agent@bot.com"
+          git add content/drafts/
+          git status
+          git diff --staged --quiet || git commit -m "draft: $(date +%Y-%m-%d) ${{ github.event.inputs.tipo }}"
+          git push
