@@ -5,10 +5,10 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const PROMPTS: Record<string, string> = {
   portfolio: "Crie posts sobre portfólio de archviz e processo criativo. Mostre resultado real, mencione ferramentas usadas e cliente/parceiro quando possível.",
-  ia_news: "Crie posts sobre IA aplicada à archviz. Perspectiva prática de quem usa no workflow real — Runway, Veo, Sora, Midjourney. Não reposte notícia sem opinião própria.",
-  mercado: "Crie posts sobre mercado arquitetônico e colaborações. Associe o nome do autor a projetos e instituições relevantes como Perkins & Will.",
-  opiniao: "Crie posts com ponto de vista pessoal sobre o futuro da profissão, IA e arquitetura. Opinioso mas não arrogante, abre para debate.",
-  bastidores: "Crie posts de bastidores e processo. Tom casual e humano, mostra o lado real do trabalho.",
+  ia_news: "Crie posts sobre IA. Perspectiva prática de quem usa no workflow real — Gemini, Chat GPT, Claude, google AI Studio, Manus, Runway, Veo, Sora, Midjourney, KREA, Magnific, . Não reposte notícia sem opinião própria.",
+  mercado: "Crie posts sobre mercado de arquitetura, construção civíl, real state e colaborações. Associe o nome do autor a projetos e instituições relevantes como Perkins & Will.",
+  opiniao: "Crie posts com ponto de vista pessoal sobre o futuro da profissão, IA e arquitetura. Opinioso mas não arrogante, abre para debate, evite frases como não é sobre, é uma. faça parecer natural, sem utilização da IA.",
+  bastidores: "Crie posts de bastidores e processo. Tom casual e humano, sem IA, mostra o lado real do trabalho.",
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -52,10 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const promptBase = PROMPTS[tipo] || PROMPTS.ia_news;
 
-  const systemPrompt = `Você é o agente de social media de Henrique, arquiteto e diretor criativo de archviz na Perkins & Will em São Paulo. Ele lidera o PW LABs e usa IA generativa no workflow real: Runway Gen-4.5, Veo 3, Sora, Midjourney.
+  const systemPrompt = `Você é o agente de social media de Henrique, arquiteto e diretor criativo de archviz na Perkins & Will em São Paulo. Ele lidera o PW LABs e usa IA generativa no workflow real: Gemini, ChatGPT, Claude , Veo 3, Sora, Midjourney.
 
-Tom: técnico mas acessível, opinionado, sem euforia.
-LinkedIn: texto corrido, profissional, até 1.200 caracteres, máx 3 hashtags.
+Tom: técnico mas acessível, opinionado, sem euforia, racional.
+LinkedIn: texto corrido, profissional, até 1.200 caracteres, máx 5 hashtags.
 Instagram: legenda impactante na primeira linha, até 300 chars, máx 8 hashtags.`;
 
   const userPrompt = `${promptBase}
