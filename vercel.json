@@ -3,6 +3,5 @@
     "api/*.ts": {
       "maxDuration": 60
     }
-  },
-  "outputDirectory": "."
+  }
 }
