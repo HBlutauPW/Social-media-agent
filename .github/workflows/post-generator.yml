@@ -40,14 +40,13 @@ jobs:
           TIPO: ${{ github.event.inputs.tipo }}
           IDIOMA: ${{ github.event.inputs.idioma }}
         run: |
-          echo "Chamando agente em $VERCEL_URL"
-          curl -s -o draft.json -w "%{http_code}" \
-            -X POST "$VERCEL_URL/api/generate" \
+          echo "Chamando agente..."
+          curl -v -X POST "$VERCEL_URL/api/generate" \
             -H "Content-Type: application/json" \
             -H "X-Secret: $AGENT_SECRET" \
             -d "{\"tipo\":\"$TIPO\",\"idioma\":\"$IDIOMA\",\"material\":\"\"}" \
-            > status.txt
-          cat status.txt
+            -o draft.json
+          echo "--- Conteúdo do draft.json ---"
           cat draft.json
 
       - name: Salvar draft
