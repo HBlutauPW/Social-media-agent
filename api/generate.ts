@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -10,27 +11,17 @@ const PROMPTS: Record<string, string> = {
   bastidores: "Crie posts de bastidores e processo. Tom casual e humano, mostra o lado real do trabalho.",
 };
 
-export default async function handler(req: Request): Promise<Response> {
-  const secret = req.headers.get("X-Secret");
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const secret = req.headers["x-secret"];
   if (secret !== process.env.AGENT_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  let input: any;
-  try {
-    input = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
-  }
-
-  const { tipo = "ia_news", idioma = "pt+en", material = "", projeto = "", parceiro = "" } = input;
+  const { tipo = "ia_news", idioma = "pt+en", material = "", projeto = "", parceiro = "" } = req.body || {};
   const promptBase = PROMPTS[tipo] || PROMPTS.ia_news;
 
   const systemPrompt = `Você é o agente de social media de Henrique, arquiteto e diretor criativo de archviz na Perkins & Will em São Paulo. Ele lidera o PW LABs e usa IA generativa no workflow real: Runway Gen-4.5, Veo 3, Sora, Midjourney.
@@ -82,7 +73,6 @@ Gere exatamente neste formato:
 
     const content = response.content[0].type === "text" ? response.content[0].text : "";
     const date = new Date().toISOString().split("T")[0];
-
     const draft = `---
 tipo: ${tipo}
 idioma: ${idioma}
@@ -94,14 +84,12 @@ parceiro: "${parceiro}"
 
 ${content}`;
 
-    return new Response(
-      JSON.stringify({ ok: true, draft, filename: `content/drafts/${date}-${tipo}.md` }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(200).json({
+      ok: true,
+      draft,
+      filename: `content/drafts/${date}-${tipo}.md`,
+    });
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message || "Erro desconhecido" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(500).json({ error: error.message || "Erro desconhecido" });
   }
 }
