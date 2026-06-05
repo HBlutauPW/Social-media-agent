@@ -1,13 +1,10 @@
 name: 🤖 Social Media Post Generator
 
 on:
-  # Automático: 3x por semana às 7h de Brasília (10h UTC)
   schedule:
-    - cron: '0 10 * * 1'   # Segunda — LinkedIn ia_news
-    - cron: '0 10 * * 3'   # Quarta  — LinkedIn mercado
-    - cron: '0 10 * * 5'   # Sexta   — LinkedIn opiniao
-
-  # Manual: você escolhe tipo, idioma e material
+    - cron: '0 10 * * 1'
+    - cron: '0 10 * * 3'
+    - cron: '0 10 * * 5'
   workflow_dispatch:
     inputs:
       tipo:
@@ -31,27 +28,9 @@ on:
           - 'pt'
           - 'en'
       material:
-        description: 'Material bruto (descreva o projeto, notícia ou ideia)'
+        description: 'Material bruto'
         required: false
         default: ''
-      projeto:
-        description: 'Nome do projeto (opcional)'
-        required: false
-        default: ''
-      parceiro:
-        description: 'Parceiro ou cliente (opcional, ex: Perkins & Will)'
-        required: false
-        default: ''
-      tom:
-        description: 'Tom do post'
-        required: false
-        default: 'profissional e direto'
-        type: choice
-        options:
-          - 'profissional e direto'
-          - 'inspirador'
-          - 'analítico'
-          - 'casual'
 
 jobs:
   generate-post:
@@ -60,85 +39,15 @@ jobs:
       contents: write
 
     steps:
-      - name: 📥 Checkout do repositório
+      - name: Checkout do repositório
         uses: actions/checkout@v4
 
-      # Define o tipo de post baseado no dia (para o cron)
-      - name: 🗓️ Detectar tipo pelo dia da semana
-        id: detect
+      - name: Chamar agente e gerar post
         run: |
-          DAY=$(date +%u)  # 1=Seg, 3=Qua, 5=Sex
-          INPUT_TIPO="${{ github.event.inputs.tipo }}"
-
-          if [ -n "$INPUT_TIPO" ]; then
-            TIPO="$INPUT_TIPO"
-          elif [ "$DAY" = "1" ]; then
-            TIPO="ia_news"
-          elif [ "$DAY" = "3" ]; then
-            TIPO="mercado"
-          elif [ "$DAY" = "5" ]; then
-            TIPO="opiniao"
-          else
-            TIPO="ia_news"
-          fi
-
-          echo "tipo=$TIPO" >> $GITHUB_OUTPUT
-          echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
-          echo "📌 Tipo detectado: $TIPO"
-
-      - name: 🤖 Chamar agente e gerar post
-        id: generate
-        run: |
-          RESPONSE=$(curl -s -X POST \
+          echo "Chamando: ${{ secrets.VERCEL_URL }}/api/generate"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "${{ secrets.VERCEL_URL }}/api/generate" \
             -H "Content-Type: application/json" \
             -H "X-Secret: ${{ secrets.AGENT_SECRET }}" \
-            -d '{
-              "tipo": "${{ steps.detect.outputs.tipo }}",
-              "idioma": "${{ github.event.inputs.idioma || 'pt+en' }}",
-              "material": "${{ github.event.inputs.material || '' }}",
-              "projeto": "${{ github.event.inputs.projeto || '' }}",
-              "parceiro": "${{ github.event.inputs.parceiro || '' }}",
-              "tom": "${{ github.event.inputs.tom || 'profissional e direto' }}"
-            }')
-
-          echo "response<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-          # Extrai o draft e salva no arquivo
-          echo "$RESPONSE" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          if 'draft' in data:
-              with open('content/drafts/${{ steps.detect.outputs.date }}-${{ steps.detect.outputs.tipo }}.md', 'w') as f:
-                  f.write(data['draft'])
-              print('✓ Draft salvo')
-          else:
-              print('✗ Erro:', data.get('error', 'Resposta vazia'))
-              exit(1)
-          "
-
-      - name: 💾 Commit do draft gerado
-        run: |
-          git config user.name "Social Media Agent"
-          git config user.email "agent@social-bot.noreply"
-          git add content/drafts/
-          
-          if git diff --staged --quiet; then
-            echo "Nenhum arquivo novo para commit"
-          else
-            git commit -m "🤖 draft: ${{ steps.detect.outputs.date }} — ${{ steps.detect.outputs.tipo }}"
-            git push
-            echo "✓ Draft commitado e enviado para o repositório"
-          fi
-
-      - name: 📣 Resumo
-        run: |
-          echo "## ✅ Post gerado com sucesso" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tipo:** ${{ steps.detect.outputs.tipo }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Data:** ${{ steps.detect.outputs.date }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Arquivo:** \`content/drafts/${{ steps.detect.outputs.date }}-${{ steps.detect.outputs.tipo }}.md\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Acesse o arquivo no repositório para revisar e agendar o post." >> $GITHUB_STEP_SUMMARY
+            -d "{\"tipo\":\"${{ github.event.inputs.tipo || 'ia_news' }}\",\"idioma\":\"${{ github.event.inputs.idioma || 'pt+en' }}\",\"material\":\"
